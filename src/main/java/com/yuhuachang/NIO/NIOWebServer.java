@@ -1,27 +1,27 @@
-package com.yuhuachang;
+package com.yuhuachang.NIO;
 
+import com.yuhuachang.AbstractWebServer;
+import com.yuhuachang.Request.HttpRequest;
 import com.yuhuachang.Response.HttpResponse;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.logging.Handler;
 
 public class NIOWebServer extends AbstractWebServer implements Runnable {
     private ServerSocketChannel serverSocketChannel = null;
     private Selector selector = null;
-    private int remoteClientNum = 0;
+    private List<NIOHandler> handlers = new ArrayList<>();
 
     public NIOWebServer(int port) {
         super(port);
-    }
-
-    public int getRemoteClientNum() {
-        return remoteClientNum;
     }
 
     @Override
@@ -52,6 +52,10 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
         }
     }
 
+    public void addHandler(NIOHandler handler) {
+        handlers.add(handler);
+    }
+
     private void initChannel(int port) {
         try {
             serverSocketChannel = ServerSocketChannel.open();
@@ -62,6 +66,7 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        handlers.add(new NIOWebServerHandler());
     }
 
     private void registerChannel(SocketChannel channel, int opt) {
@@ -81,23 +86,11 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        remoteClientNum++;
     }
 
     private void read(SelectionKey key) throws IOException {
-        SocketChannel socketChannel = (SocketChannel) key.channel();
-        ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
-        int count = 0;
-        StringBuilder message = new StringBuilder();
-        while ((count = socketChannel.read(byteBuffer)) > 0) {
-            byteBuffer.flip();
-            message.append(new String(byteBuffer.array(), "UTF-8"));
+        for (NIOHandler handler : handlers) {
+            handler.read(key);
         }
-        System.out.println(message);
-        sendHttpResponse(socketChannel, "hello world\n");
-    }
-
-    private void sendHttpResponse(SocketChannel channel, String content) {
-        new HttpResponse(channel).write(content);
     }
 }

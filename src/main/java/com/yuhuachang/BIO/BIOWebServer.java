@@ -1,15 +1,21 @@
-package com.yuhuachang;
+package com.yuhuachang.BIO;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.yuhuachang.AbstractWebServer;
+import com.yuhuachang.Request.HttpRequest;
+import com.yuhuachang.Response.ContentType;
 import com.yuhuachang.Response.HttpResponse;
 
 public class BIOWebServer extends AbstractWebServer implements Runnable {
-    protected ServerSocket serverSocket = null;
+    private ServerSocket serverSocket = null;
+    private List<BIOHandler> handlers = new ArrayList<>();
     private static int t = 0;
 
     public BIOWebServer(int port) {
@@ -22,10 +28,11 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
         while (true) {
             try {
                 Socket clientSocket = this.serverSocket.accept();
-                System.out.println("received msg" + t++);
                 threadPool.execute(() -> {
                     try {
-                        processRequestHandler(clientSocket);
+                        for (BIOHandler handler : handlers) {
+                            handler.handle(clientSocket);
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -36,26 +43,26 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
         }
     }
 
+    public void addHandler(BIOHandler handler) {
+        handlers.add(handler);
+    }
+
     protected void initServer(int port) {
         try {
             this.serverSocket = new ServerSocket(this.port);
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private void processRequestHandler(Socket clientSocket) throws IOException {
-        InputStream input = clientSocket.getInputStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-        String str;
-        while ((str = reader.readLine()).equals(""))
-            System.out.println(str);
-        System.out.println(str);
-        OutputStream output = clientSocket.getOutputStream();
-        HttpResponse response = new HttpResponse(output);
-        response.write("hello world\n");
-        input.close();
-        output.close();
-        clientSocket.close();
+        handlers.add(clientSocket -> {
+            InputStream input = clientSocket.getInputStream();
+            OutputStream output = clientSocket.getOutputStream();
+            HttpRequest request = new HttpRequest(input);
+            System.out.println(request.getMethod() + " " + request.getUrl());
+            HttpResponse response = new HttpResponse(output);
+            response.write("hello world\n", ContentType.TXT);
+            input.close();
+            output.close();
+            clientSocket.close();
+        });
     }
 }

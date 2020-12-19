@@ -37,8 +37,8 @@ public class HttpResponse {
         headerLines.add("Date: " + date);
     }
 
-    public void write(String content) {
-        fillHeader(Status.OK, ContentType.TXT);
+    public void write(String content, ContentType type) {
+        fillHeader(Status.OK, type);
         headerLines.add("Content-Length: " + content.length());
         if (output != null) {
             try (DataOutputStream dataOutputStream = new DataOutputStream(output)){
