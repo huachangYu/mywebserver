@@ -39,7 +39,7 @@ public class HttpResponse {
 
     public void write(String content, ContentType type) {
         fillHeader(Status.OK, type);
-        headerLines.add("Content-Length: " + content.length());
+        headerLines.add("Content-Length: " + content.getBytes().length);
         if (output != null) {
             try (DataOutputStream dataOutputStream = new DataOutputStream(output)){
                 for (String line : headerLines) {

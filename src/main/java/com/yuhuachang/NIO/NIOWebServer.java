@@ -1,8 +1,6 @@
 package com.yuhuachang.NIO;
 
 import com.yuhuachang.AbstractWebServer;
-import com.yuhuachang.Request.HttpRequest;
-import com.yuhuachang.Response.HttpResponse;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -13,7 +11,6 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.logging.Handler;
 
 public class NIOWebServer extends AbstractWebServer implements Runnable {
     private ServerSocketChannel serverSocketChannel = null;
@@ -43,6 +40,7 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
                 } else if (key.isReadable()) {
                     try {
                         read(key);
+                        key.channel().close();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

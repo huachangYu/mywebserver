@@ -6,13 +6,15 @@ import com.yuhuachang.Response.HttpResponse;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class NIOWebServerHandler implements NIOHandler{
-    private static String rootPath = "www/";
+    private static String rootPath = "www";
 
     @Override
     public void read(SelectionKey key) {
@@ -20,25 +22,20 @@ public class NIOWebServerHandler implements NIOHandler{
         HttpRequest request = new HttpRequest(socketChannel);
         System.out.println(request.getMethod() + " " + request.getUrl());
         if (request.getUrl().equals("/")) {
-            writeFile(socketChannel, "index.html");
+            writeFile(socketChannel, "/index.html");
+        } else {
+            writeFile(socketChannel, request.getUrl());
         }
     }
 
     public void writeFile(SocketChannel channel, String path) {
         String relativePath = rootPath + path;
-        StringBuilder sb = new StringBuilder();
-        File file = new File(relativePath);
-        int fileLength = (int) file.length();
-        byte[] bytes = new byte[fileLength];
+        Path filePath = Paths.get(relativePath);
         try {
-            FileInputStream fileInputStream = new FileInputStream(file);
-            fileInputStream.read(bytes);
-            fileInputStream.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            byte[] bytes = Files.readAllBytes(filePath);
+            new HttpResponse(channel).write(new String(bytes), ContentType.HTML);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        new HttpResponse(channel).write(new String(bytes), ContentType.HTML);
     }
 }
