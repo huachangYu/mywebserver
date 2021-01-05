@@ -10,4 +10,6 @@ public abstract class AbstractWebServer {
     public int getPort() {
         return port;
     }
+
+    protected void initServer(int port) {}
 }

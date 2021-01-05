@@ -3,11 +3,10 @@ package com.yuhuachang.NIO;
 import com.yuhuachang.Request.HttpRequest;
 import com.yuhuachang.Response.ContentType;
 import com.yuhuachang.Response.HttpResponse;
+import com.yuhuachang.Response.Status;
+import com.yuhuachang.WebSocket.WebSocketHandler;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,24 +16,26 @@ public class NIOWebServerHandler implements NIOHandler{
     private static String rootPath = "www";
 
     @Override
-    public void read(SelectionKey key) {
-        SocketChannel socketChannel = (SocketChannel) key.channel();
-        HttpRequest request = new HttpRequest(socketChannel);
-        System.out.println(request.getMethod() + " " + request.getUrl());
-        if (request.getUrl().equals("/")) {
-            writeFile(socketChannel, "/index.html");
+    public void read(SocketChannel socketChannel, HttpRequest request) {
+        if (request.isWebsocket()) {
+            new WebSocketHandler(socketChannel, request).connect();
+        } else if (request.getUrl() == null) {
+            // do nothing
+        } else if (request.getUrl().equals("/")) {
+            writeFile(socketChannel, "/index.html", ContentType.HTML);
         } else {
-            writeFile(socketChannel, request.getUrl());
+            writeFile(socketChannel, request.getUrl(), ContentType.HTML);
         }
     }
 
-    public void writeFile(SocketChannel channel, String path) {
+    public void writeFile(SocketChannel channel, String path, ContentType type) {
         String relativePath = rootPath + path;
         Path filePath = Paths.get(relativePath);
         try {
             byte[] bytes = Files.readAllBytes(filePath);
-            new HttpResponse(channel).write(new String(bytes), ContentType.HTML);
+            new HttpResponse(channel).write(new String(bytes), type);
         } catch (IOException e) {
+            new HttpResponse(channel).write("", type, Status.NOT_FOUND);
             e.printStackTrace();
         }
     }

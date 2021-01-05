@@ -16,7 +16,6 @@ import com.yuhuachang.Response.HttpResponse;
 public class BIOWebServer extends AbstractWebServer implements Runnable {
     private ServerSocket serverSocket = null;
     private List<BIOHandler> handlers = new ArrayList<>();
-    private static int t = 0;
 
     public BIOWebServer(int port) {
         super(port);
@@ -47,9 +46,10 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
         handlers.add(handler);
     }
 
+    @Override
     protected void initServer(int port) {
         try {
-            this.serverSocket = new ServerSocket(this.port);
+            this.serverSocket = new ServerSocket(port);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -59,7 +59,7 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
             HttpRequest request = new HttpRequest(input);
             System.out.println(request.getMethod() + " " + request.getUrl());
             HttpResponse response = new HttpResponse(output);
-            response.write("hello world\n", ContentType.TXT);
+            response.write("hello world\n", ContentType.HTML);
             input.close();
             output.close();
             clientSocket.close();

@@ -1,9 +1,11 @@
 package com.yuhuachang.NIO;
 
 import com.yuhuachang.AbstractWebServer;
+import com.yuhuachang.Request.HttpRequest;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -11,11 +13,14 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class NIOWebServer extends AbstractWebServer implements Runnable {
+    private final static ConcurrentHashMap<String, SocketChannel> websocketChannels = new ConcurrentHashMap<>();
     private ServerSocketChannel serverSocketChannel = null;
     private Selector selector = null;
-    private List<NIOHandler> handlers = new ArrayList<>();
+    private List<NIOHandler> httpHandlers = new ArrayList<>();
+    private List<NIOWebSocketHandler> webSocketHandlers = new ArrayList<>();
 
     public NIOWebServer(int port) {
         super(port);
@@ -40,7 +45,6 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
                 } else if (key.isReadable()) {
                     try {
                         read(key);
-                        key.channel().close();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -51,7 +55,7 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
     }
 
     public void addHandler(NIOHandler handler) {
-        handlers.add(handler);
+        httpHandlers.add(handler);
     }
 
     private void initChannel(int port) {
@@ -64,7 +68,7 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        handlers.add(new NIOWebServerHandler());
+        httpHandlers.add(new NIOWebServerHandler());
     }
 
     private void registerChannel(SocketChannel channel, int opt) {
@@ -87,8 +91,15 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
     }
 
     private void read(SelectionKey key) throws IOException {
-        for (NIOHandler handler : handlers) {
-            handler.read(key);
+        SocketChannel socketChannel = (SocketChannel) key.channel();
+        HttpRequest request = new HttpRequest(socketChannel);
+        if (request.getData() != null) {
+            socketChannel.write(ByteBuffer.wrap(request.getData()));
+        } else {
+            System.out.println(request.getMethod() + " " + request.getUrl());
+            for (NIOHandler handler : httpHandlers) {
+                handler.read(socketChannel, request);
+            }
         }
     }
 }

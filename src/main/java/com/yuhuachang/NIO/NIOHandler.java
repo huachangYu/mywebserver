@@ -1,7 +1,9 @@
 package com.yuhuachang.NIO;
 
-import java.nio.channels.SelectionKey;
+import com.yuhuachang.Request.HttpRequest;
+
+import java.nio.channels.SocketChannel;
 
 public interface NIOHandler {
-    void read(SelectionKey key);
+    void read(SocketChannel channel, HttpRequest request);
 }
