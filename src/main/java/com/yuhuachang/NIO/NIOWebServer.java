@@ -4,6 +4,7 @@ import com.yuhuachang.AbstractWebServer;
 import com.yuhuachang.Request.HttpRequest;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
