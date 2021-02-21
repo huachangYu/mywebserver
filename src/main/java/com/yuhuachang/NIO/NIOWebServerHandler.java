@@ -4,7 +4,6 @@ import com.yuhuachang.Request.HttpRequest;
 import com.yuhuachang.Response.ContentType;
 import com.yuhuachang.Response.HttpResponse;
 import com.yuhuachang.Response.Status;
-import com.yuhuachang.WebSocket.WebSocketHandler;
 
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
@@ -12,14 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-public class NIOWebServerHandler implements NIOHandler{
+public class NIOWebServerHandler implements HttpHandler {
     private static String rootPath = "www";
 
     @Override
-    public void read(SocketChannel socketChannel, HttpRequest request) {
-        if (request.isWebsocket()) {
-            new WebSocketHandler(socketChannel, request).connect();
-        } else if (request.getUrl() == null) {
+    public void handle(SocketChannel socketChannel, HttpRequest request) {
+        if (request.getUrl() == null) {
             // do nothing
         } else if (request.getUrl().equals("/")) {
             writeFile(socketChannel, "/index.html", ContentType.HTML);

@@ -8,10 +8,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 
 import java.nio.channels.SocketChannel;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class WebSocketHandler {
     private static String CRLF = "\r\n";
@@ -57,6 +54,7 @@ public class WebSocketHandler {
             }
             ChannelUtil.writeToChannel(channel, CRLF);
         }
+        send("hello");
     }
 
     public void read(byte[] data) {
@@ -64,14 +62,68 @@ public class WebSocketHandler {
     }
 
     public void send(String content) {
-
+        if (channel != null) {
+            byte[] response = encodeDataFrame("hello", 1, 1);
+            ChannelUtil.writeToChannel(channel, response);
+        }
     }
 
     public void close() {
 
     }
 
-    private byte[] encode(String content) {
-        return null;
+    public static int minusByte2UnsignedInt(byte b) {
+        if (b >= 0) {
+            throw new IllegalArgumentException("input byte must be less than 0");
+        }
+        return (((b ^ 0x7f) + 1) & 0xff);
+    }
+
+    public static byte[] decodeDataFrame(byte[] dataFrame) {
+        int length = 0;
+        if (Math.abs(dataFrame[1]) < 127) {
+            length = Math.abs(dataFrame[1]);
+            return Arrays.copyOfRange(dataFrame, 2, dataFrame.length);
+        } else if (Math.abs(dataFrame[2]) < 127) {
+//            length = (127 << 8) + (((dataFrame[2] ^ 0x7f) + 1) & 0xff);
+            length = (127 << 8) + minusByte2UnsignedInt(dataFrame[2]);
+            return Arrays.copyOfRange(dataFrame, 3, dataFrame.length);
+        } else {
+            length = ((dataFrame[6] < 0 ? minusByte2UnsignedInt(dataFrame[6]) : dataFrame[6]) << 24) +
+                    ((dataFrame[7] < 0 ? minusByte2UnsignedInt(dataFrame[7]) : dataFrame[7]) << 16) +
+                    ((dataFrame[8] < 0 ? minusByte2UnsignedInt(dataFrame[8]) : dataFrame[8]) << 8) +
+                    (dataFrame[9] < 0 ? minusByte2UnsignedInt(dataFrame[9]) : dataFrame[9]);
+            return Arrays.copyOfRange(dataFrame, 10, dataFrame.length);
+        }
+    }
+
+    public static byte[] encodeDataFrame(String content, int fin, int opcode) {
+        List<Byte> bytes = new Vector<>();
+        bytes.add((byte) ((fin << 7) + opcode));
+        int length = content.getBytes().length;
+        if (length < 126) {
+            bytes.add((byte) length);
+        } else if (length < 0x10000) {
+            bytes.addAll(Arrays.asList(
+                    (byte) 126,
+                    (byte) (length & 0xFF00 >> 8),
+                    (byte) (length & 0xFF))
+            );
+        } else {
+            bytes.addAll(Arrays.asList(
+                    (byte) 127, (byte) 0, (byte) 0, (byte) 0, (byte) 0,
+                    (byte) ((length & 0xFF000000) >> 24),
+                    (byte) ((length & 0xFF0000) >> 16),
+                    (byte) ((length & 0xFF00) >> 8),
+                    (byte) (length & 0xFF)));
+        }
+        for (byte b : content.getBytes()) {
+            bytes.add(b);
+        }
+        byte[] dataFrame = new byte[bytes.size()];
+        for (int i = 0; i < bytes.size(); i++) {
+            dataFrame[i] = bytes.get(i);
+        }
+        return dataFrame;
     }
 }

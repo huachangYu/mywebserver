@@ -2,9 +2,9 @@ package com.yuhuachang.NIO;
 
 import com.yuhuachang.AbstractWebServer;
 import com.yuhuachang.Request.HttpRequest;
+import com.yuhuachang.WebSocket.WebSocketHandler;
 
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -20,8 +20,8 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
     private final static ConcurrentHashMap<String, SocketChannel> websocketChannels = new ConcurrentHashMap<>();
     private ServerSocketChannel serverSocketChannel = null;
     private Selector selector = null;
-    private List<NIOHandler> httpHandlers = new ArrayList<>();
-    private List<NIOWebSocketHandler> webSocketHandlers = new ArrayList<>();
+    private SelectionKeyHandlerImp selectionKeyHandlerImp = new SelectionKeyHandlerImp();
+
 
     public NIOWebServer(int port) {
         super(port);
@@ -41,22 +41,10 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
             Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
             while (iterator.hasNext()) {
                 SelectionKey key = iterator.next();
-                if (key.isAcceptable()) {
-                    accept(key);
-                } else if (key.isReadable()) {
-                    try {
-                        read(key);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
+                selectionKeyHandlerImp.handle(key, selector);
                 iterator.remove();
             }
         }
-    }
-
-    public void addHandler(NIOHandler handler) {
-        httpHandlers.add(handler);
     }
 
     private void initChannel(int port) {
@@ -69,38 +57,6 @@ public class NIOWebServer extends AbstractWebServer implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        httpHandlers.add(new NIOWebServerHandler());
-    }
-
-    private void registerChannel(SocketChannel channel, int opt) {
-        try {
-            channel.configureBlocking(false);
-            channel.register(selector, opt);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void accept(SelectionKey key) {
-        ServerSocketChannel server = (ServerSocketChannel) key.channel();
-        try {
-            SocketChannel channel = server.accept();
-            registerChannel(channel, SelectionKey.OP_READ);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void read(SelectionKey key) throws IOException {
-        SocketChannel socketChannel = (SocketChannel) key.channel();
-        HttpRequest request = new HttpRequest(socketChannel);
-        if (request.getData() != null) {
-            socketChannel.write(ByteBuffer.wrap(request.getData()));
-        } else {
-            System.out.println(request.getMethod() + " " + request.getUrl());
-            for (NIOHandler handler : httpHandlers) {
-                handler.read(socketChannel, request);
-            }
-        }
+        selectionKeyHandlerImp.addHttpHandler(new NIOWebServerHandler());
     }
 }
