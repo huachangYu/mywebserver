@@ -77,7 +77,6 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
                 relativePath = rootPath + "/index.html";
             }
             Path filePath = Paths.get(relativePath);
-            String content = null;
             try {
                 response.write(new String(Files.readAllBytes(filePath)), ContentType.HTML);
             } catch (IOException e) {

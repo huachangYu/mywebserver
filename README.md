@@ -1,2 +1,4 @@
 # MyWebServer
-完成了BIO/NIO的web服务器，websocket连接正在开发中
+一个简易的webserver
+1. 支持BIO和NIO模型
+2. 支持http协议和websocket协议

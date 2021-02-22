@@ -1,6 +1,6 @@
 package com.yuhuachang.WebSocket;
 
-import com.yuhuachang.ChannelUtil;
+import com.yuhuachang.Util.ChannelUtil;
 import com.yuhuachang.Request.HttpRequest;
 import com.yuhuachang.Response.Status;
 import org.apache.commons.codec.binary.Base64;

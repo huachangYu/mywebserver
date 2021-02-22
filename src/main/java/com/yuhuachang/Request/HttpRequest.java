@@ -66,7 +66,7 @@ public class HttpRequest {
 
     private void decodeHeader() {
         StringBuilder message = new StringBuilder();
-        if (input != null) {
+        if (input != null) { // BIO模型的情况下
             byte b;
             List<Byte> bytes = new Vector<>();
             BufferedReader reader = new BufferedReader(new InputStreamReader(input));
@@ -81,7 +81,7 @@ public class HttpRequest {
             for (int i = 0; i < bytes.size(); i++) {
                 this.data[i] = bytes.get(i);
             }
-        } else if (socketChannel != null) {
+        } else if (socketChannel != null) { // NIO模型的情况下
             try {
                 ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

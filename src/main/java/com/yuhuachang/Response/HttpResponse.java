@@ -1,6 +1,6 @@
 package com.yuhuachang.Response;
 
-import com.yuhuachang.ChannelUtil;
+import com.yuhuachang.Util.ChannelUtil;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
