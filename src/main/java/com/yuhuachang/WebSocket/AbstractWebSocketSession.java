@@ -6,29 +6,30 @@ import com.yuhuachang.Response.Status;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
 
+import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-public class WebSocketHandler {
+public abstract class AbstractWebSocketSession {
     private static String CRLF = "\r\n";
     private static String VERSION = "HTTP/1.1";
     private static String MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-    private HttpRequest request = null;
+    private HttpRequest connectionRequest = null;
     private SocketChannel channel = null;
     private String url = null;
     private List<String> headerLines = new ArrayList<>();
 
-    public WebSocketHandler(SocketChannel channel,  HttpRequest request) {
-        this.request = request;
-        this.url = request.getUrl();
+    public AbstractWebSocketSession(SocketChannel channel, HttpRequest connectionRequest) {
+        this.connectionRequest = connectionRequest;
+        this.url = connectionRequest.getUrl();
         this.channel = channel;
     }
 
     private void fillHeaderLines() {
         headerLines.clear();
         String key = "";
-        List<String> requestHeaderLines = request.getHeaderLines();
+        List<String> requestHeaderLines = connectionRequest.getHeaderLines();
         for (String line : requestHeaderLines) {
             String[] splits = line.split(": ");
             if (splits.length >= 2 && splits[0].equals("Sec-WebSocket-Key")) {
@@ -54,53 +55,55 @@ public class WebSocketHandler {
             }
             ChannelUtil.writeToChannel(channel, CRLF);
         }
-        send("hello");
-    }
-
-    public void read(byte[] data) {
-
     }
 
     public void send(String content) {
         if (channel != null) {
-            byte[] response = encodeDataFrame("hello", 1, 1);
+            byte[] response = encodeDataFrame(content, 1, 1);
             ChannelUtil.writeToChannel(channel, response);
         }
     }
 
     public void close() {
-
-    }
-
-    public static int minusByte2UnsignedInt(byte b) {
-        if (b >= 0) {
-            throw new IllegalArgumentException("input byte must be less than 0");
+        try {
+            channel.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return (((b ^ 0x7f) + 1) & 0xff);
     }
 
     public static byte[] decodeDataFrame(byte[] dataFrame) {
-        int length = 0;
-        if (Math.abs(dataFrame[1]) < 127) {
-            length = Math.abs(dataFrame[1]);
-            return Arrays.copyOfRange(dataFrame, 2, dataFrame.length);
-        } else if (Math.abs(dataFrame[2]) < 127) {
-//            length = (127 << 8) + (((dataFrame[2] ^ 0x7f) + 1) & 0xff);
-            length = (127 << 8) + minusByte2UnsignedInt(dataFrame[2]);
-            return Arrays.copyOfRange(dataFrame, 3, dataFrame.length);
-        } else {
-            length = ((dataFrame[6] < 0 ? minusByte2UnsignedInt(dataFrame[6]) : dataFrame[6]) << 24) +
-                    ((dataFrame[7] < 0 ? minusByte2UnsignedInt(dataFrame[7]) : dataFrame[7]) << 16) +
-                    ((dataFrame[8] < 0 ? minusByte2UnsignedInt(dataFrame[8]) : dataFrame[8]) << 8) +
-                    (dataFrame[9] < 0 ? minusByte2UnsignedInt(dataFrame[9]) : dataFrame[9]);
-            return Arrays.copyOfRange(dataFrame, 10, dataFrame.length);
+        int i = 0;
+        int fin = (dataFrame[i] & 0xff) >>> 7;
+        int opcode = dataFrame[i++] & 15;
+        int mask = (dataFrame[i] & 0xff) >>> 7;
+        int payloadLength = dataFrame[i++] & 0x7f;
+        if (payloadLength == 126) {
+            payloadLength = (dataFrame[i++] << 8) + dataFrame[i++];
+        } else if (payloadLength == 127) {
+            payloadLength = (dataFrame[i++] << 24) + (dataFrame[i++] << 16) +
+                    (dataFrame[i++] << 8) + dataFrame[i++];
         }
+        byte[] data = new byte[payloadLength];
+        if (mask == 1) {
+            byte[] maskingKey = new byte[] {dataFrame[i++], dataFrame[i++], dataFrame[i++], dataFrame[i++]};
+            for (int j = 0; j < payloadLength; j++) {
+                data[j] = (byte) (dataFrame[i+j] ^ maskingKey[j % 4]);
+            }
+        } else {
+            data = Arrays.copyOfRange(dataFrame, i, i + payloadLength);
+        }
+        return data;
     }
 
     public static byte[] encodeDataFrame(String content, int fin, int opcode) {
+        return encodeDataFrame(content.getBytes(), fin, opcode);
+    }
+
+    public static byte[] encodeDataFrame(byte[] data, int fin, int opcode) {
         List<Byte> bytes = new Vector<>();
         bytes.add((byte) ((fin << 7) + opcode));
-        int length = content.getBytes().length;
+        int length = data.length;
         if (length < 126) {
             bytes.add((byte) length);
         } else if (length < 0x10000) {
@@ -117,7 +120,7 @@ public class WebSocketHandler {
                     (byte) ((length & 0xFF00) >> 8),
                     (byte) (length & 0xFF)));
         }
-        for (byte b : content.getBytes()) {
+        for (byte b : data) {
             bytes.add(b);
         }
         byte[] dataFrame = new byte[bytes.size()];
@@ -125,5 +128,9 @@ public class WebSocketHandler {
             dataFrame[i] = bytes.get(i);
         }
         return dataFrame;
+    }
+
+    public SocketChannel getChannel() {
+        return channel;
     }
 }

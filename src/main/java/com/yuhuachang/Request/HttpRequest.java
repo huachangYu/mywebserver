@@ -1,13 +1,13 @@
 package com.yuhuachang.Request;
 
+import com.yuhuachang.WebSocket.AbstractWebSocketSession;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Vector;
 
 public class HttpRequest {
     private InputStream input = null;
@@ -89,15 +89,15 @@ public class HttpRequest {
             byteArrayOutputStream.flush();
             this.data = byteArrayOutputStream.toByteArray();
             byteArrayOutputStream.close();
-            System.out.println(message);
-            System.out.println(this.data);
-            headerLines = new ArrayList<>(Arrays.asList(message.toString().split("\r\n")));
-        }
 
-        // Decide whether the message is a websocket dataframe
-        if (headerLines.size() == 0) {
-            websocketMessage = true;
-            return;
+            // 判断是否为websocket报文帧
+            if (!message.toString().contains("HTTP/")) {
+                System.out.println(Arrays.toString(this.data));
+                websocketMessage = true;
+                return;
+            }
+            System.out.println(message);
+            headerLines = new ArrayList<>(Arrays.asList(message.toString().split("\r\n")));
         }
 
         // Get method and url
