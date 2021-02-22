@@ -3,11 +3,14 @@ package com.yuhuachang.Request;
 import com.yuhuachang.WebSocket.AbstractWebSocketSession;
 
 import java.io.*;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Vector;
 
 public class HttpRequest {
     private InputStream input = null;
@@ -21,20 +24,12 @@ public class HttpRequest {
 
     public HttpRequest(InputStream input) {
         this.input = input;
-        try {
-            decodeHeader();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        decodeHeader();
     }
 
     public HttpRequest(SocketChannel socketChannel) {
         this.socketChannel = socketChannel;
-        try {
-            decodeHeader();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        decodeHeader();
     }
 
     public boolean isWebsocketConnect() {
@@ -69,36 +64,49 @@ public class HttpRequest {
         return headerLines;
     }
 
-    private void decodeHeader() throws IOException {
+    private void decodeHeader() {
+        StringBuilder message = new StringBuilder();
         if (input != null) {
-            String line;
+            byte b;
+            List<Byte> bytes = new Vector<>();
             BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-            while (!(line = reader.readLine()).equals("")) {
-                headerLines.add(line);
+            try {
+                while ((b = (byte) reader.read()) != -1) {
+                    bytes.add(b);
+                }
+            } catch (IOException ignored) {
+
+            }
+            this.data = new byte[bytes.size()];
+            for (int i = 0; i < bytes.size(); i++) {
+                this.data[i] = bytes.get(i);
             }
         } else if (socketChannel != null) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
-            StringBuilder message = new StringBuilder();
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            while (socketChannel.read(byteBuffer) > 0) {
-                byteBuffer.flip();
-                byte[] array = byteBuffer.array();
-                byteArrayOutputStream.write(array);
-                message.append(new String(array, "UTF-8"));
+            try {
+                ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                while (socketChannel.read(byteBuffer) > 0) {
+                    byteBuffer.flip();
+                    byte[] array = byteBuffer.array();
+                    byteArrayOutputStream.write(array);
+//                message.append(new String(array, StandardCharsets.UTF_8));
+                }
+                byteArrayOutputStream.flush();
+                this.data = byteArrayOutputStream.toByteArray();
+                byteArrayOutputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            byteArrayOutputStream.flush();
-            this.data = byteArrayOutputStream.toByteArray();
-            byteArrayOutputStream.close();
-
-            // 判断是否为websocket报文帧
-            if (!message.toString().contains("HTTP/")) {
-                System.out.println(Arrays.toString(this.data));
-                websocketMessage = true;
-                return;
-            }
-            System.out.println(message);
-            headerLines = new ArrayList<>(Arrays.asList(message.toString().split("\r\n")));
         }
+        message.append(new String(this.data));
+        // 判断是否为websocket报文帧
+        if (!message.toString().contains("HTTP/")) {
+            System.out.println(Arrays.toString(this.data));
+            websocketMessage = true;
+            return;
+        }
+        System.out.println(message);
+        headerLines = new ArrayList<>(Arrays.asList(message.toString().split("\r\n")));
 
         // Get method and url
         String[] firstLineSplits = headerLines.get(0).split(" ");

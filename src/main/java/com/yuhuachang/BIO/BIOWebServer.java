@@ -3,6 +3,10 @@ package com.yuhuachang.BIO;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +18,7 @@ import com.yuhuachang.Response.ContentType;
 import com.yuhuachang.Response.HttpResponse;
 
 public class BIOWebServer extends AbstractWebServer implements Runnable {
+    private static String rootPath = "www";
     private ServerSocket serverSocket = null;
     private List<BIOHandler> handlers = new ArrayList<>();
 
@@ -29,13 +34,21 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
                 Socket clientSocket = this.serverSocket.accept();
                 threadPool.execute(() -> {
                     try {
+                        clientSocket.setSoTimeout(100);
+                        InputStream input = clientSocket.getInputStream();
+                        OutputStream output = clientSocket.getOutputStream();
+                        HttpRequest request = new HttpRequest(input);
                         for (BIOHandler handler : handlers) {
-                            handler.handle(clientSocket);
+                            handler.handle(request,output);
                         }
+                        input.close();
+                        output.close();
+                        clientSocket.close();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 });
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -53,16 +66,24 @@ public class BIOWebServer extends AbstractWebServer implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        handlers.add(clientSocket -> {
-            InputStream input = clientSocket.getInputStream();
-            OutputStream output = clientSocket.getOutputStream();
-            HttpRequest request = new HttpRequest(input);
+        handlers.add((request, output) -> {
             System.out.println(request.getMethod() + " " + request.getUrl());
             HttpResponse response = new HttpResponse(output);
-            response.write("hello world\n", ContentType.HTML);
-            input.close();
-            output.close();
-            clientSocket.close();
+            String relativePath = rootPath + request.getUrl();
+            if (request.getUrl() == null) {
+                return;
+            }
+            if (request.getUrl().equals("/")) {
+                relativePath = rootPath + "/index.html";
+            }
+            Path filePath = Paths.get(relativePath);
+            String content = null;
+            try {
+                response.write(new String(Files.readAllBytes(filePath)), ContentType.HTML);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
         });
     }
 }

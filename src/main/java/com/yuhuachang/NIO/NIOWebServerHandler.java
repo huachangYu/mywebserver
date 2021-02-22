@@ -32,7 +32,7 @@ public class NIOWebServerHandler implements HttpHandler {
             byte[] bytes = Files.readAllBytes(filePath);
             new HttpResponse(channel).write(new String(bytes), type);
         } catch (IOException e) {
-            new HttpResponse(channel).write("", type, Status.NOT_FOUND);
+            new HttpResponse(channel).write("not found", type, Status.NOT_FOUND);
             e.printStackTrace();
         }
     }
