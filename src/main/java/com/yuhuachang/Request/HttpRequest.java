@@ -54,6 +54,14 @@ public class HttpRequest {
         return socketChannel;
     }
 
+    public String getBody() {
+        return body;
+    }
+
+    public boolean isFile() {
+        return isFile;
+    }
+
     public byte[] getData() {
         return data;
     }
@@ -179,5 +187,6 @@ public class HttpRequest {
         }
         System.out.println("body:");
         System.out.println(this.body);
+        System.out.println(body.trim().length());
     }
 }

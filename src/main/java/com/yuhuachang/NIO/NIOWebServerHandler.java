@@ -18,6 +18,11 @@ public class NIOWebServerHandler implements HttpHandler {
     public void handle(SocketChannel socketChannel, HttpRequest request) {
         if (request.getUrl() == null) {
             // do nothing
+        } else if (request.getUrl().contains("?")) {
+            // handle get or post
+            System.out.println("handle get or post");
+            System.out.println(request.getUrl());
+            writeMessage(socketChannel, "resp:" + request.getUrl(), ContentType.HTML);
         } else if (request.getUrl().equals("/")) {
             writeFile(socketChannel, "/index.html", ContentType.HTML);
         } else {
@@ -35,5 +40,9 @@ public class NIOWebServerHandler implements HttpHandler {
             new HttpResponse(channel).write("not found", type, Status.NOT_FOUND);
             e.printStackTrace();
         }
+    }
+
+    public void writeMessage(SocketChannel channel, String message, ContentType type) {
+        new HttpResponse(channel).write(message, type);
     }
 }
