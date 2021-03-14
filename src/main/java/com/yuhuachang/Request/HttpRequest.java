@@ -1,12 +1,11 @@
 package com.yuhuachang.Request;
 
-import com.yuhuachang.WebSocket.AbstractWebSocketSession;
-
 import java.io.*;
-import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -21,6 +20,9 @@ public class HttpRequest {
     private boolean websocketMessage = false;
     private String method = null;
     private String url = null;
+    private String body = null;
+    private boolean isFile = false;
+    private String suffix = "";
 
     public HttpRequest(InputStream input) {
         this.input = input;
@@ -98,15 +100,29 @@ public class HttpRequest {
                 e.printStackTrace();
             }
         }
+        if (this.data.length == 0) {
+            return;
+        }
         message.append(new String(this.data));
+
         // 判断是否为websocket报文帧
         if (!message.toString().contains("HTTP/")) {
-            System.out.println(Arrays.toString(this.data));
             websocketMessage = true;
             return;
         }
-        System.out.println(message);
-        headerLines = new ArrayList<>(Arrays.asList(message.toString().split("\r\n")));
+
+        String[] headerBody = message.toString().split("\r\n\r\n");
+        String header = headerBody[0];
+        if (headerBody[0].contains("image/png")) {
+            this.isFile = true;
+            this.suffix = ".png";
+        }
+        String body = headerBody[1];
+
+        String[] lines = header.split("\r\n");
+        for (String line : lines) {
+            headerLines.add(line);
+        }
 
         // Get method and url
         String[] firstLineSplits = headerLines.get(0).split(" ");
@@ -114,6 +130,24 @@ public class HttpRequest {
             method = firstLineSplits[0];
             url = firstLineSplits[1];
         }
+        if (method.equals("POST")) {
+            if (headerBody.length >= 3) {
+                for (int i = 1; i < headerBody.length - 1; i++) {
+                    if (headerBody[i].contains("image/png")) {
+                        this.isFile = true;
+                        this.suffix = "png";
+                    }
+                    String[] nextLines = headerBody[i].split("\r\n");
+                    for (String line : nextLines) {
+                        headerLines.add(line);
+                    }
+                }
+                body = headerBody[headerBody.length - 1];
+            }
+        }
+
+        this.body = body;
+
         // Decide whether the connect is a websocket
         for (String line : headerLines) {
             String[] splits = line.split(": ");
@@ -122,5 +156,28 @@ public class HttpRequest {
                 break;
             }
         }
+        if (isFile) {
+            try {
+                byte[] bytes = this.body.getBytes(StandardCharsets.UTF_8);
+                int capacity = bytes.length;
+                for (String line : headerLines) {
+                    if (line.contains("Content-Length")) {
+                        capacity = Integer.valueOf(lines[9].split(":")[1].trim());
+                        break;
+                    }
+                }
+                byte[] fileData = Arrays.copyOf(bytes, capacity);
+                Files.write(Path.of("/home/yuhuachang/codes/java/mywebserver/www/tmp" + suffix), fileData);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        System.out.println("headerlines:");
+        for (String line : headerLines) {
+            System.out.println(line);
+        }
+        System.out.println("body:");
+        System.out.println(this.body);
     }
 }
