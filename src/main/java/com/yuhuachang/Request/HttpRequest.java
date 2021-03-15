@@ -3,13 +3,9 @@ package com.yuhuachang.Request;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Vector;
+import java.util.*;
 
 public class HttpRequest {
     private InputStream input = null;
@@ -20,18 +16,18 @@ public class HttpRequest {
     private boolean websocketMessage = false;
     private String method = null;
     private String url = null;
-    private String body = null;
+    private byte[] body = null;
     private boolean isFile = false;
     private String suffix = "";
 
     public HttpRequest(InputStream input) {
         this.input = input;
-        decodeHeader();
+        decodeHttpDataFrame();
     }
 
     public HttpRequest(SocketChannel socketChannel) {
         this.socketChannel = socketChannel;
-        decodeHeader();
+        decodeHttpDataFrame();
     }
 
     public boolean isWebsocketConnect() {
@@ -54,7 +50,7 @@ public class HttpRequest {
         return socketChannel;
     }
 
-    public String getBody() {
+    public byte[] getBody() {
         return body;
     }
 
@@ -74,7 +70,7 @@ public class HttpRequest {
         return headerLines;
     }
 
-    private void decodeHeader() {
+    private void decodeHttpDataFrame() {
         StringBuilder message = new StringBuilder();
         if (input != null) { // BIO模型的情况下
             byte b;
@@ -97,9 +93,8 @@ public class HttpRequest {
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                 while (socketChannel.read(byteBuffer) > 0) {
                     byteBuffer.flip();
-                    byte[] array = byteBuffer.array();
+                    byte[]array = byteBuffer.array();
                     byteArrayOutputStream.write(array);
-//                message.append(new String(array, StandardCharsets.UTF_8));
                 }
                 byteArrayOutputStream.flush();
                 this.data = byteArrayOutputStream.toByteArray();
@@ -119,17 +114,47 @@ public class HttpRequest {
             return;
         }
 
-        String[] headerBody = message.toString().split("\r\n\r\n");
-        String header = headerBody[0];
-        if (headerBody[0].contains("image/png")) {
-            this.isFile = true;
-            this.suffix = ".png";
+        List<Byte> headerLine = new ArrayList<>();
+        /***
+         * 0: normal, 1:'\r', 2: '\n', 3:'\r', 4: '\n'"image/jpeg
+         */
+        int state = 0;
+        int dataInd = 0;
+        for (; dataInd < this.data.length; dataInd++) {
+            char c = (char) this.data[dataInd];
+            if ((state == 0 && c == '\r') || (state == 1 && c == '\n') ||
+                    (state == 2 && c == '\r') || (state == 3 && c == '\n')) {
+                state++;
+            } else {
+        List<Byte> bodyBytes = new ArrayList<>();
+                headerLine.add(this.data[dataInd]);
+                state = 0;
+            }
+            if (state == 2) {
+                byte[] headerLineBytes = new byte[headerLine.size()];
+                for (int j = 0; j < headerLine.size(); j++) {
+                    headerLineBytes[j] = headerLine.get(j);
+                }
+                this.headerLines.add(new String(headerLineBytes));
+                headerLine.clear();
+            }
+            if (state == 4) break;
         }
-        String body = headerBody[1];
+        int bodyLength = -1;
+        for (String line : this.headerLines) {
+            if (line.contains("Content-Length")) {
+                bodyLength = Integer.valueOf(line.split(":")[1].trim());
+                break;
+            }
+        }
 
-        String[] lines = header.split("\r\n");
-        for (String line : lines) {
-            headerLines.add(line);
+        if (bodyLength >= 0) {
+            this.body = new byte[bodyLength];
+            for (int i = 0; i < bodyLength; i++) {
+                if (++dataInd < this.data.length) {
+                    this.body[i] = this.data[dataInd];
+                };
+            }
         }
 
         // Get method and url
@@ -138,26 +163,16 @@ public class HttpRequest {
             method = firstLineSplits[0];
             url = firstLineSplits[1];
         }
-        if (method.equals("POST")) {
-            if (headerBody.length >= 3) {
-                for (int i = 1; i < headerBody.length - 1; i++) {
-                    if (headerBody[i].contains("image/png")) {
-                        this.isFile = true;
-                        this.suffix = "png";
-                    }
-                    String[] nextLines = headerBody[i].split("\r\n");
-                    for (String line : nextLines) {
-                        headerLines.add(line);
-                    }
-                }
-                body = headerBody[headerBody.length - 1];
-            }
-        }
 
-        this.body = body;
-
-        // Decide whether the connect is a websocket
+        // Decide whether the connect is a websocket or a file
         for (String line : headerLines) {
+            if (line.contains("image/jpeg")) {
+                isFile = true;
+                this.suffix = "jpg";
+            } else if (line.contains("image/png")) {
+                isFile = true;
+                this.suffix = "png";
+            }
             String[] splits = line.split(": ");
             if (splits.length >= 2 && splits[1].equals("websocket")) {
                 websocketConnect = true;
@@ -166,27 +181,11 @@ public class HttpRequest {
         }
         if (isFile) {
             try {
-                byte[] bytes = this.body.getBytes(StandardCharsets.UTF_8);
-                int capacity = bytes.length;
-                for (String line : headerLines) {
-                    if (line.contains("Content-Length")) {
-                        capacity = Integer.valueOf(lines[9].split(":")[1].trim());
-                        break;
-                    }
-                }
-                byte[] fileData = Arrays.copyOf(bytes, capacity);
-                Files.write(Path.of("/home/yuhuachang/codes/java/mywebserver/www/tmp" + suffix), fileData);
+                UUID uid = UUID.randomUUID();
+                Files.write(Path.of("/home/yuhuachang/codes/java/mywebserver/www/" + uid.toString() + "." + suffix), this.body);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-
-        System.out.println("headerlines:");
-        for (String line : headerLines) {
-            System.out.println(line);
-        }
-        System.out.println("body:");
-        System.out.println(this.body);
-        System.out.println(body.trim().length());
     }
 }

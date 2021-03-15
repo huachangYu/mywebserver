@@ -18,14 +18,14 @@ public class NIOWebServerHandler implements HttpHandler {
     public void handle(SocketChannel socketChannel, HttpRequest request) {
         if (request.getUrl() == null) {
             // do nothing
-        } else if (request.getUrl().contains("?")) {
+        } else if (request.getUrl().contains("?") || request.getMethod().equals("POST")) {
             // handle get or post
             System.out.println("handle get or post");
             System.out.println(request.getUrl());
             writeMessage(socketChannel, "resp:" + request.getUrl(), ContentType.HTML);
-        } else if (request.getUrl().equals("/")) {
+        } else if (request.getUrl().equals("/") && request.getMethod().equals("GET")) {
             writeFile(socketChannel, "/index.html", ContentType.HTML);
-        } else {
+        } else if (request.getMethod().equals("GET")) {
             writeFile(socketChannel, request.getUrl(), ContentType.HTML);
         }
     }
